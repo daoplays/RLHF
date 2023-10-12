@@ -216,7 +216,7 @@ if __name__ == "__main__":
             # if we are using RLHF then we want to replace the reward with the value from the reward network
             if (args.rlhf):
                 for i in range(len(reward)):
-                    reward_input = torch.tensor([new_obs[i][0], new_obs[i][1], action[i]], dtype=torch.float)
+                    reward_input = torch.tensor([new_obs[i][0], new_obs[i][1], action[i]], dtype=torch.float).to(device)
                     raw_reward = reward_network.get_reward(reward_input)
                     clipped_reward = torch.clamp(raw_reward, -1, 1)
                     reward[i] = clipped_reward
