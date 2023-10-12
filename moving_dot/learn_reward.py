@@ -49,8 +49,8 @@ class RewardAgent(nn.Module):
         return loss
 
 def check_reward(agent, row):
-    x1 = torch.tensor([row[1], row[2], row[3]], dtype=torch.float)
-    x2 = torch.tensor([row[4], row[5], row[6]], dtype=torch.float)
+    x1 = torch.tensor([row[1], row[2], row[3]], dtype=torch.float).to(device)
+    x2 = torch.tensor([row[4], row[5], row[6]], dtype=torch.float).to(device)
 
     mu_1 = row[7]
     mu_2 = row[8]
@@ -118,15 +118,15 @@ if __name__ == "__main__":
 
     historical_loss = []
     in_sample_progress = []
-    batch_size = 100
+    batch_size = 128
     for epoch in range(100000):
 
         entries = np.random.choice(len(preference_table), batch_size, False)
         batch = preference_table[entries]
-        s1 = torch.tensor(batch[:,1:4], dtype = torch.float)
-        s2 = torch.tensor(batch[:,4:7], dtype = torch.float)
-        m1 = torch.tensor(batch[:,7], dtype = torch.float)
-        m2 = torch.tensor(batch[:,8], dtype = torch.float)
+        s1 = torch.tensor(batch[:,1:4], dtype = torch.float).to(device)
+        s2 = torch.tensor(batch[:,4:7], dtype = torch.float).to(device)
+        m1 = torch.tensor(batch[:,7], dtype = torch.float).to(device)
+        m2 = torch.tensor(batch[:,8], dtype = torch.float).to(device)
 
         loss = agent.get_loss(s1, s2, m1, m2).sum()
         
