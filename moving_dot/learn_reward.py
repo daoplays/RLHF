@@ -60,7 +60,7 @@ def check_reward(agent, row):
 
     return reward_one.item(), reward_two.item(), mu_1, mu_2
 
-def check_agent(agent, preference_table):
+def check_agent(agent, preference_table, n_samples=0):
 
     in_sample = np.zeros([len(preference_table), 2])
     for i in range(len(preference_table)):
@@ -96,7 +96,9 @@ def check_agent(agent, preference_table):
     plt.hist(mid_bins[:-1], mid_bins, weights=mid_hist, alpha = 0.5, color = "magenta", label = "s1 = s2")
     plt.hist(pos_bins[:-1], pos_bins, weights=pos_hist, alpha = 0.5, color = "red", label = "s1 > s2")
     plt.legend()
-    plt.show()
+    plt.title(str(n_samples))
+    plt.savefig("images/" + str(n_samples))
+    plt.close()
 
     validation_conn.close()
     return in_sample
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         historical_loss.append(loss.item())
 
         if (epoch in checkpoint_intervals):
-            in_sample = check_agent(agent, preference_table)
+            in_sample = check_agent(agent, preference_table, epoch)
             in_sample_progress.append(in_sample)
 
     plt.plot(np.convolve(historical_loss, np.ones(100), 'valid') / 100)
