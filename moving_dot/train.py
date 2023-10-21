@@ -15,7 +15,7 @@ import torch.optim as optim
 from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
 
-from learn_reward import RewardAgent
+from learn_reward import RewardModel
 
 
 def parse_args():
@@ -69,12 +69,13 @@ def parse_args():
         help="the target KL divergence threshold")
     parser.add_argument("--rlhf", type=lambda x: bool(strtobool(x)), default=False, nargs="?", const=True,
         help="Toggles use of rewards network")
+    parser.add_argument("--save_model", type=str, default="None",
+        help="Save the model at the end of training")
     
     args = parser.parse_args()
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
 
-    print("RLHF", args.rlhf)
     # fmt: on
     return args
 
@@ -170,7 +171,7 @@ if __name__ == "__main__":
 
     reward_network = None
     if (args.rlhf):
-        reward_network = RewardAgent(2 + 1).to(device)
+        reward_network = RewardModel(2 + 1).to(device)
         reward_network.load_state_dict(torch.load("./rewards_model"))
         reward_network.eval()
 
@@ -216,7 +217,7 @@ if __name__ == "__main__":
             # if we are using RLHF then we want to replace the reward with the value from the reward network
             if (args.rlhf):
                 for i in range(len(reward)):
-                    reward_input = torch.tensor([new_obs[i][0], new_obs[i][1], action[i]], dtype=torch.float)
+                    reward_input = torch.tensor([new_obs[i][0], new_obs[i][1], action[i]], dtype=torch.float).to(device)
                     raw_reward = reward_network.get_reward(reward_input)
                     clipped_reward = torch.clamp(raw_reward, -1, 1)
                     reward[i] = clipped_reward
@@ -233,7 +234,7 @@ if __name__ == "__main__":
                     if i == None:
                         continue
                     if "episode" in i.keys():
-                        print(f"global_step={global_step}, episodic_return={i['episode']['r']}")
+                        print(f"global_step {global_step} episodic_return {i['episode']['r'][0]}")
                         writer.add_scalar("charts/episodic_return", i["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", i["episode"]["l"], global_step)
                         break
@@ -320,7 +321,8 @@ if __name__ == "__main__":
         #print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
-        torch.save(agent.state_dict(), "./rlhf_trained")
+        if (args.save_model != "None"):
+            torch.save(agent.state_dict(), "./"+args.save_model)
 
 
     envs.close()

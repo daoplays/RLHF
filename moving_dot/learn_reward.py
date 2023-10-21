@@ -11,7 +11,7 @@ import torch.optim as optim
 from db import *
 from log import *
 from make_preferences_db import make_db
-
+import os
 
 def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.orthogonal_(layer.weight, std)
@@ -19,9 +19,9 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-class RewardAgent(nn.Module):
+class RewardModel(nn.Module):
     def __init__(self, input_size):
-        super(RewardAgent, self).__init__()
+        super(RewardModel, self).__init__()
         self.network = nn.Sequential(
             layer_init(nn.Linear(input_size, 64)),
             nn.Tanh(),
@@ -49,8 +49,8 @@ class RewardAgent(nn.Module):
         return loss
 
 def check_reward(agent, row):
-    x1 = torch.tensor([row[1], row[2], row[3]], dtype=torch.float)
-    x2 = torch.tensor([row[4], row[5], row[6]], dtype=torch.float)
+    x1 = torch.tensor([row[1], row[2], row[3]], dtype=torch.float).to(device)
+    x2 = torch.tensor([row[4], row[5], row[6]], dtype=torch.float).to(device)
 
     mu_1 = row[7]
     mu_2 = row[8]
@@ -60,7 +60,7 @@ def check_reward(agent, row):
 
     return reward_one.item(), reward_two.item(), mu_1, mu_2
 
-def check_agent(agent, preference_table, n_samples=0):
+def check_agent(agent, preference_table, n_samples=0, plot=False):
 
     in_sample = np.zeros([len(preference_table), 2])
     for i in range(len(preference_table)):
@@ -97,8 +97,12 @@ def check_agent(agent, preference_table, n_samples=0):
     plt.hist(pos_bins[:-1], pos_bins, weights=pos_hist, alpha = 0.5, color = "red", label = "s1 > s2")
     plt.legend()
     plt.title(str(n_samples))
-    plt.savefig("images/" + str(n_samples))
-    plt.close()
+
+    if (plot):
+        plt.show()
+    else:
+        plt.savefig("images/" + str(n_samples))
+        plt.close()
 
     validation_conn.close()
     return in_sample
@@ -109,26 +113,31 @@ if __name__ == "__main__":
     make_db("preferences.db")
     make_db("validation_preferences.db")
 
+    # make images directory
+    if (not os.path.isdir("./images")):
+        os.mkdir("./images")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     conn = create_database_connection()
     preference_table = get_rows(conn)
 
-    agent = RewardAgent(2 + 1).to(device)
+    agent = RewardModel(2 + 1).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=2.5e-4, eps=1e-5)
 
+    plot = True
     checkpoint_intervals = [0, 1000, 10000, 25000, 100000]
 
     historical_loss = []
     in_sample_progress = []
-    batch_size = 100
+    batch_size = 128
     for epoch in range(100000):
 
         entries = np.random.choice(len(preference_table), batch_size, False)
         batch = preference_table[entries]
-        s1 = torch.tensor(batch[:,1:4], dtype = torch.float)
-        s2 = torch.tensor(batch[:,4:7], dtype = torch.float)
-        m1 = torch.tensor(batch[:,7], dtype = torch.float)
-        m2 = torch.tensor(batch[:,8], dtype = torch.float)
+        s1 = torch.tensor(batch[:,1:4], dtype = torch.float).to(device)
+        s2 = torch.tensor(batch[:,4:7], dtype = torch.float).to(device)
+        m1 = torch.tensor(batch[:,7], dtype = torch.float).to(device)
+        m2 = torch.tensor(batch[:,8], dtype = torch.float).to(device)
 
         loss = agent.get_loss(s1, s2, m1, m2).sum()
         
@@ -142,11 +151,15 @@ if __name__ == "__main__":
         historical_loss.append(loss.item())
 
         if (epoch in checkpoint_intervals):
-            in_sample = check_agent(agent, preference_table, epoch)
+            in_sample = check_agent(agent, preference_table, epoch, plot)
             in_sample_progress.append(in_sample)
 
-    plt.plot(np.convolve(historical_loss, np.ones(100), 'valid') / 100)
-    plt.show()
+    plt.plot(np.convolve(historical_loss, np.ones(100), 'valid') / 100)   
+    plt.xlabel("epoch")
+    plt.ylabel("loss")
+    plt.title("Moving Average Of Reward Model Training Loss")
+    plt.savefig("images/training_loss.png")
+    plt.close()
     torch.save(agent.state_dict(), "./rewards_model")
 
     check_agent(agent, preference_table)

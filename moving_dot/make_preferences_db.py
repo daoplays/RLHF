@@ -20,33 +20,32 @@ def make_db(db_name = "preferences.db"):
 	actions[4] = np.array([-1,0])
 
 	# for some reason the gym environment can only go between (4,4) and (205, 155)
-	x1_min = 4
-	x2_min = 4
-	x1_max = 205
-	x2_max = 155
+	y_min = 4
+	x_min = 4
+	y_max = 205
+	x_max = 155
 
-	x1 = 210
-	x2 = 160
-	mid_point = np.array([x1/2, x2/2])
-
+	n_segments = 10000
 	segments = []
-
-	n_comparisons = 10000
-	for i in range(n_comparisons):
+	for i in range(n_segments):
 		
-		obs = np.array([np.random.randint(x1_min, x1_max+1), np.random.randint(x2_min, x2_max+1)])
+		obs = np.array([np.random.randint(y_min, y_max+1), np.random.randint(x_min, x_max+1)])
 		a = np.random.randint(0, n_actions)
-		next_obs = obs + actions[a]
-		segments.append((obs, next_obs, a))
+		segments.append((obs, a))
 
-		
+	mid_point = np.array([105, 80])
+	n_comparisons = 10000
 	comparisons = []
 	for i in range(n_comparisons):
 		chosen_segments = random.sample(segments, 2)
-		s1 = chosen_segments[0]
-		s2 = chosen_segments[1]
-		move_1 = np.sqrt(np.sum((s1[0]-mid_point)**2)) - np.sqrt(np.sum((s1[1]-mid_point)**2))
-		move_2 = np.sqrt(np.sum((s2[0]-mid_point)**2)) - np.sqrt(np.sum((s2[1]-mid_point)**2))
+		obs_1, action_1 = chosen_segments[0]
+		obs_2, action_2 = chosen_segments[1]
+
+		next_obs_1 = obs_1 + actions[action_1]
+		next_obs_2 = obs_2 + actions[action_2]
+
+		move_1 = np.sqrt(np.sum((obs_1 - mid_point)**2)) - np.sqrt(np.sum((next_obs_1 - mid_point)**2))
+		move_2 = np.sqrt(np.sum((obs_2 - mid_point)**2)) - np.sqrt(np.sum((next_obs_2 - mid_point)**2))
 
 		mu_1 = 0.5
 		mu_2 = 0.5
@@ -61,7 +60,7 @@ def make_db(db_name = "preferences.db"):
 			mu_1 = 0
 			mu_2 = 1
 
-		entry = [len(comparisons), int(s1[0][0]), int(s1[0][1]), int(s1[2]), int(s2[0][0]), int(s2[0][1]), int(s2[2]), mu_1, mu_2]
+		entry = [len(comparisons), int(obs_1[0]), int(obs_1[1]), int(action_1), int(obs_2[0]), int(obs_2[1]), int(action_2), mu_1, mu_2]
 		comparisons.append(entry)
 
 	conn = create_database_connection(db_name)
